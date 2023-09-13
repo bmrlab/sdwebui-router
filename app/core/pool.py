@@ -131,14 +131,20 @@ class Res:
 
     def _sd_params_preprocessing(self, item):
         logger.info(f"_sd_params_preprocessing start")
-        # img2img参数预处理
-        mode = item.mode
-        if mode == "img2img":
-            logger.info(f"_sd_params_preprocessing img2img start")
+
+        # images 出现在 img2img 和 extra_batch_images
+        if "images" in item.sd_params:
+            logger.info(f"_sd_params_preprocessing images start")
             # 将可读图片链接转化成PIL类型
             item.sd_params["images"] = [
                 Image.open(BytesIO(requests.get(img, timeout=10).content)) for img in item.sd_params["images"]
             ]
+        
+        # image 出现在 extra_single_image
+        if "image" in item.sd_params:
+            logger.info(f"_sd_params_preprocessing image start")
+            item.sd_params["image"] = Image.open(BytesIO(requests.get(item.sd_params["image"], timeout=10).content))
+            
         # 将sd_params 中的 mask_image 转化成PIL类型
         if "mask_image" in item.sd_params:
             logger.info(f"_sd_params_preprocessing mask_image start")
