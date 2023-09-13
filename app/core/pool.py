@@ -178,7 +178,8 @@ class Res:
 
     def process(self, item):
         # 初始化
-        self._setup(item)
+        if item.setup_params:
+            self._setup(item)
         # 开始触发生成
         result_data = getattr(self.webuiapi, item.mode)(**item.sd_params)
         data = {"info": result_data.info, "parameters": result_data.parameters, "images": []}
