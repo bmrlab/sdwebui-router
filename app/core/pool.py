@@ -117,7 +117,12 @@ class Res:
         # 刷新ckpt(即使模型存在 也需要refresh一下)
         self.webuiapi.refresh_checkpoints()
 
-        self._sd_params_preprocessing(item, prompt=item.prompt)
+        self._sd_params_preprocessing(item, extra_sd_params={
+            # prompt参数设置
+            "prompt": item.prompt,
+            # 修复sdwebui会错误携带controlnet模型的问题
+            "alwayson_scripts": {}
+        })
 
         # 切换模型
         self._switch_model(model=base_model_name)
@@ -141,7 +146,7 @@ class Res:
             _prompts_lora_suffix += f",<lora:{lora_hash}:{lora_alpha}>"
         return _prompts_lora_suffix
 
-    def _sd_params_preprocessing(self, item, prompt=None):
+    def _sd_params_preprocessing(self, item, extra_sd_params=None):
         logger.info(f"_sd_params_preprocessing start")
 
         # images 出现在 img2img 和 extra_batch_images
@@ -184,11 +189,10 @@ class Res:
             for unit in item.sd_params["controlnet_units"]:
                 # 将调用过的controlnet添加到路由记录中
                 self.controlnet_history.add(unit.model)
-        # prompt参数设置
-        if prompt is not None:
-            item.sd_params["prompt"] = prompt
-        # 修复sdwebui会错误携带controlnet模型的问题
-        item.sd_params["alwayson_scripts"] = {}
+                
+        if extra_sd_params is not None:
+            for key, value in extra_sd_params.items():
+                item.sd_params[key] = value
 
     def _switch_model(self, model):
         logger.info(f"切换模型: {model}")
