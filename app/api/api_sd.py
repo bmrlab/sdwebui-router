@@ -17,12 +17,9 @@ class GenImg(RWModel):
 def gen_img(item: GenImg):
     logger.info(f"start gen_img: {item}")
     from app import pool
-
     try:
         ckpt_model_name = item.setup_params.get("base_model", {}).get("name", "")
-        controlnet_model_list = [
-            unit["model"] for unit in item.sd_params.get("controlnet_units", [])
-        ]
+        controlnet_model_list = [unit['model'] for unit in item.sd_params.get("controlnet_units", [])]
         res = pool.pick(ckpt_model_name, controlnet_model_list)
         with res:
             data = res.process(item)

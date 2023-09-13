@@ -22,8 +22,15 @@ class Res:
     origin: str
     status: str = S_IDLE
 
-    def __init__(self, origin, dl_server_origin, status=S_IDLE, status_time=time.time(), ckpt_history_size=5,
-                 controlnet_history_size=5):
+    def __init__(
+        self,
+        origin,
+        dl_server_origin,
+        status=S_IDLE,
+        status_time=time.time(),
+        ckpt_history_size=5,
+        controlnet_history_size=5,
+    ):
         self.origin = origin
         self.status = status
         self.status_time = status_time
@@ -57,7 +64,7 @@ class Res:
     def _setup(self, item):
         # 前置准备工作
         base_model = item.setup_params.get("base_model", {})
-        base_model_name = base_model['name']
+        base_model_name = base_model["name"]
 
         vae_model = item.setup_params.get("vae_model", {})
         controlnet_list = item.setup_params.get("controlnet_list", [])
@@ -74,8 +81,12 @@ class Res:
             if not vae_copy_is_exist:
                 vae_is_exist = self.file_downloader.check(target_vae_filepath)
                 if not vae_is_exist:
-                    self.file_downloader.fetch(url=vae_model['url'], save_to=target_vae_filepath)
-                self.file_downloader.make_copy(src=target_vae_filepath, target=target_vae_copy_filepath)
+                    self.file_downloader.fetch(
+                        url=vae_model["url"], save_to=target_vae_filepath
+                    )
+                self.file_downloader.make_copy(
+                    src=target_vae_filepath, target=target_vae_copy_filepath
+                )
         else:
             if self.file_downloader.check(filepath=target_vae_copy_filepath):
                 self.file_downloader.remove(filepath=target_vae_copy_filepath)
@@ -84,11 +95,13 @@ class Res:
         for controlnet in controlnet_list:
             target_control_filepath = f"models/ControlNet/{controlnet['name']}"
             controlnet_is_exist = self.file_downloader.check(target_control_filepath)
-            logger.info(f"controlnet是否存在 => {controlnet_is_exist} : {controlnet_is_exist}")
+            logger.info(
+                f"controlnet是否存在 => {controlnet_is_exist} : {controlnet_is_exist}"
+            )
             if not controlnet_is_exist:
                 self.file_downloader.fetch(
-                    url=controlnet['url'],
-                    save_to=target_control_filepath)
+                    url=controlnet["url"], save_to=target_control_filepath
+                )
                 logger.info(f"controlnet模型下载完成 {controlnet}")
 
         # ---基础模型---
@@ -97,14 +110,15 @@ class Res:
         logger.info(f"基础模型是否已存在 => {target_model_filepath} : {model_is_exist}")
         if not model_is_exist:
             logger.info(f"开始下载基础模型: {base_model_name}")
-            self.file_downloader.fetch(url=base_model['url'],
-                                       save_to=target_model_filepath)
+            self.file_downloader.fetch(
+                url=base_model["url"], save_to=target_model_filepath
+            )
             logger.info(f"基础模型下载完成: {base_model_name}")
         # 刷新ckpt(即使模型存在 也需要refresh一下)
         self.webuiapi.refresh_checkpoints()
 
-        # 参数预处理
-        self._sd_params_preprocessing(item)
+        self._sd_params_preprocessing(item, prompt=item.prompt)
+
         # 切换模型
         self._switch_model(model=base_model_name)
 
@@ -122,14 +136,12 @@ class Res:
             target_filepath = f"models/Lora/{lora_hash}.safetensors"
             is_exist = self.file_downloader.check(target_filepath)
             if not is_exist:
-                self.file_downloader.fetch(
-                    url=lora_url,
-                    save_to=target_filepath)
+                self.file_downloader.fetch(url=lora_url, save_to=target_filepath)
                 self.webuiapi.session.post(url=f"{self.webuiapi.baseurl}/refresh-loras")
             _prompts_lora_suffix += f",<lora:{lora_hash}:{lora_alpha}>"
         return _prompts_lora_suffix
 
-    def _sd_params_preprocessing(self, item):
+    def _sd_params_preprocessing(self, item, prompt=None):
         logger.info(f"_sd_params_preprocessing start")
 
         # images 出现在 img2img 和 extra_batch_images
@@ -137,14 +149,17 @@ class Res:
             logger.info(f"_sd_params_preprocessing images start")
             # 将可读图片链接转化成PIL类型
             item.sd_params["images"] = [
-                Image.open(BytesIO(requests.get(img, timeout=10).content)) for img in item.sd_params["images"]
+                Image.open(BytesIO(requests.get(img, timeout=10).content))
+                for img in item.sd_params["images"]
             ]
-        
+
         # image 出现在 extra_single_image
         if "image" in item.sd_params:
             logger.info(f"_sd_params_preprocessing image start")
-            item.sd_params["image"] = Image.open(BytesIO(requests.get(item.sd_params["image"], timeout=10).content))
-            
+            item.sd_params["image"] = Image.open(
+                BytesIO(requests.get(item.sd_params["image"], timeout=10).content)
+            )
+
         # 将sd_params 中的 mask_image 转化成PIL类型
         if "mask_image" in item.sd_params:
             logger.info(f"_sd_params_preprocessing mask_image start")
@@ -156,8 +171,12 @@ class Res:
             logger.info(f"_sd_params_preprocessing controlnet_units start")
             item.sd_params["controlnet_units"] = [
                 ControlNetUnit(
-                    input_image=Image.open(BytesIO(requests.get(unit.pop("input_image"), timeout=10).content)),
-                    **unit
+                    input_image=Image.open(
+                        BytesIO(
+                            requests.get(unit.pop("input_image"), timeout=10).content
+                        )
+                    ),
+                    **unit,
                 )
                 for unit in item.sd_params["controlnet_units"]
             ]
@@ -166,7 +185,8 @@ class Res:
                 # 将调用过的controlnet添加到路由记录中
                 self.controlnet_history.add(unit.model)
         # prompt参数设置
-        item.sd_params["prompt"] = item.prompt
+        if prompt is not None:
+            item.sd_params["prompt"] = prompt
         # 修复sdwebui会错误携带controlnet模型的问题
         item.sd_params["alwayson_scripts"] = {}
 
@@ -179,10 +199,20 @@ class Res:
     def process(self, item):
         # 初始化
         if item.setup_params:
+            # 带有setup_params的任务为txt2img / img2img
             self._setup(item)
+        else:
+            # 否则为extra_single_image / extra_batch_images
+            # 参数预处理
+            self._sd_params_preprocessing(item)
+
         # 开始触发生成
         result_data = getattr(self.webuiapi, item.mode)(**item.sd_params)
-        data = {"info": result_data.info, "parameters": result_data.parameters, "images": []}
+        data = {
+            "info": result_data.info,
+            "parameters": result_data.parameters,
+            "images": [],
+        }
         for image in result_data.images:
             data["images"].append(base64.b64encode(pickle.dumps(image)))
         return data
@@ -191,7 +221,9 @@ class Res:
 class Pool:
     res_list: List[Res] = []
 
-    def __init__(self, res_origin_list=[], dl_server_origin="", max_running_timeout=600):
+    def __init__(
+        self, res_origin_list=[], dl_server_origin="", max_running_timeout=600
+    ):
         # 处于running态的最大超时时间
         self.max_running_timeout = max_running_timeout
         # file-downloader服务地址
@@ -202,20 +234,27 @@ class Pool:
 
     def list_res(self):
         return [
-            {"host": item.origin, "status": item.status,
-             "state_duration": item.get_state_duration(),
-             "ckpt_history": item.cpkt_history.data,
-             "controlnet_history": item.controlnet_history.data
-             } for item in
-            self.res_list]
+            {
+                "host": item.origin,
+                "status": item.status,
+                "state_duration": item.get_state_duration(),
+                "ckpt_history": item.cpkt_history.data,
+                "controlnet_history": item.controlnet_history.data,
+            }
+            for item in self.res_list
+        ]
 
     def register(self, origin: str, ckpt_history_size=5, controlnet_history_size=5):
         if origin not in [res.origin for res in self.res_list]:
-            self.res_list.append(Res(origin=origin,
-                                     dl_server_origin=self.dl_server_origin,
-                                     status_time=time.time(),
-                                     ckpt_history_size=ckpt_history_size,
-                                     controlnet_history_size=controlnet_history_size))
+            self.res_list.append(
+                Res(
+                    origin=origin,
+                    dl_server_origin=self.dl_server_origin,
+                    status_time=time.time(),
+                    ckpt_history_size=ckpt_history_size,
+                    controlnet_history_size=controlnet_history_size,
+                )
+            )
         else:
             raise Exception("host already in register res list")
 
@@ -281,5 +320,5 @@ class BusyException(Exception):
 
 
 def unzip_file(zip_path, extract_path):
-    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+    with zipfile.ZipFile(zip_path, "r") as zip_ref:
         zip_ref.extractall(extract_path)
