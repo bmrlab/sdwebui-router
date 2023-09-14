@@ -3,7 +3,7 @@ name: WebUI Router
 on:
   push:
     # branches: [ "main" ]
-    tags:        
+    tags:
       - v*
   workflow_dispatch: {}
 
@@ -27,10 +27,9 @@ jobs:
     - name: setup versioning
       id: vars
       run: |
-        build_version="${{ github.ref_name }}"
         commit_short_hash="$(git rev-parse --short HEAD)"
-        echo "build_version=$build_version" >> $GITHUB_OUTPUT
         echo "commit_short_hash=$commit_short_hash" >> $GITHUB_OUTPUT
+        echo "build_version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
 
     - name: Build and push WebUI Router
       uses: docker/build-push-action@v4
@@ -43,3 +42,17 @@ jobs:
           ghcr.io/bmrlab/stable-diffusion-webui/webui-router:${{ steps.vars.outputs.commit_short_hash }}
           ghcr.io/bmrlab/stable-diffusion-webui/webui-router:${{ steps.vars.outputs.build_version }}
         platforms: linux/amd64
+
+    - name: Install kubectl
+      uses: azure/k8s-set-context@v1
+      with:
+        method: kubeconfig
+        kubeconfig: ${{ secrets.KUBECONFIG_AKS_MUSE_TEST }}
+
+    - name: Deploy to Kubernetes
+      run: |
+        kubectl set image deployment/webui-router webui-router=ghcr.io/bmrlab/stable-diffusion-webui/webui-router:${{ steps.vars.outputs.build_version }} -n stable-diffusion
+
+    - name: Verify Kubernetes deployment
+      run: |
+        kubectl rollout status deploy webui-router -n stable-diffusion
