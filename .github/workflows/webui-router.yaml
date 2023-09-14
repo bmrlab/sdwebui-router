@@ -1,6 +1,11 @@
 name: WebUI Router
 
-on: workflow_dispatch
+on:
+  push:
+    # branches: [ "main" ]
+    tags:        
+      - v*
+  workflow_dispatch: {}
 
 jobs:
   build:
@@ -22,8 +27,10 @@ jobs:
     - name: setup versioning
       id: vars
       run: |
-        build_version="$(git rev-parse --short HEAD)"
+        build_version="${{ github.ref_name }}"
+        commit_short_hash="$(git rev-parse --short HEAD)"
         echo "build_version=$build_version" >> $GITHUB_OUTPUT
+        echo "commit_short_hash=$commit_short_hash" >> $GITHUB_OUTPUT
 
     - name: Build and push WebUI Router
       uses: docker/build-push-action@v4
@@ -33,5 +40,6 @@ jobs:
         push: true
         tags: |
           ghcr.io/bmrlab/stable-diffusion-webui/webui-router:latest
+          ghcr.io/bmrlab/stable-diffusion-webui/webui-router:${{ steps.vars.outputs.commit_short_hash }}
           ghcr.io/bmrlab/stable-diffusion-webui/webui-router:${{ steps.vars.outputs.build_version }}
         platforms: linux/amd64
