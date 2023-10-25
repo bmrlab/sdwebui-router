@@ -1,4 +1,3 @@
-import json
 import time
 import random
 from typing import List
@@ -13,9 +12,13 @@ import zipfile
 from PIL import Image
 from io import BytesIO
 from app.core.model_load_history import History
+import os
 
 S_RUNNING = "running"
 S_IDLE = "idle"
+
+WEBUI_USERNAME = os.environ.get("WEBUI_USERNAME", "admin")
+WEBUI_PASSWORD = os.environ.get("WEBUI_PASSWORD", "admin")
 
 
 class Res:
@@ -23,19 +26,19 @@ class Res:
     status: str = S_IDLE
 
     def __init__(
-        self,
-        origin,
-        dl_server_origin,
-        status=S_IDLE,
-        status_time=time.time(),
-        ckpt_history_size=5,
-        controlnet_history_size=5,
+            self,
+            origin,
+            dl_server_origin,
+            status=S_IDLE,
+            status_time=time.time(),
+            ckpt_history_size=5,
+            controlnet_history_size=5,
     ):
         self.origin = origin
         self.status = status
         self.status_time = status_time
         self.file_downloader = FileDownloader(origin=dl_server_origin)
-        self.webuiapi = WebUIApi(baseurl=f"{self.origin}/sdapi/v1")
+        self.webuiapi = WebUIApi(baseurl=f"{self.origin}/sdapi/v1", username=WEBUI_USERNAME, password=WEBUI_PASSWORD)
         self.cpkt_history = History(size=ckpt_history_size)
         self.controlnet_history = History(size=controlnet_history_size)
 
@@ -189,7 +192,7 @@ class Res:
             for unit in item.sd_params["controlnet_units"]:
                 # 将调用过的controlnet添加到路由记录中
                 self.controlnet_history.add(unit.model)
-                
+
         if extra_sd_params is not None:
             for key, value in extra_sd_params.items():
                 item.sd_params[key] = value
@@ -226,7 +229,7 @@ class Pool:
     res_list: List[Res] = []
 
     def __init__(
-        self, res_origin_list=[], dl_server_origin="", max_running_timeout=600
+            self, res_origin_list=[], dl_server_origin="", max_running_timeout=600
     ):
         # 处于running态的最大超时时间
         self.max_running_timeout = max_running_timeout
