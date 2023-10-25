@@ -5,3 +5,5 @@ requests
 loguru
 retry
 pyyaml
+python-multipart
+python-jose

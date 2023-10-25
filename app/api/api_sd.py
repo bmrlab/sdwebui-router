@@ -1,7 +1,8 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from app.core.pool import BusyException
 from loguru import logger
 from .model import ResponseModel, RWModel
+from .api_auth import get_current_user
 
 router = APIRouter()
 
@@ -14,7 +15,7 @@ class GenImg(RWModel):
 
 
 @router.post("/gen")
-def gen_img(item: GenImg):
+def gen_img(item: GenImg, current_user: str = Depends(get_current_user)):
     logger.info(f"start gen_img: {item}")
     from app import pool
 
