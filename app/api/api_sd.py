@@ -25,9 +25,8 @@ def gen_img(item: GenImg, current_user: str = Depends(get_current_user)):
             unit["model"] for unit in item.sd_params.get("controlnet_units", [])
         ]
         res = pool.pick(ckpt_model_name, controlnet_model_list)
-        with res:
-            data = res.process(item)
-            return ResponseModel(data=data)
+        data = res.process(item)
+        return ResponseModel(data=data)
     except BusyException as e:
         return ResponseModel(data={}, status=203, message=f"{e}")
     except Exception as e:

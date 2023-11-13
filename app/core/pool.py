@@ -49,13 +49,11 @@ class Res:
         self.webuiapi = WebUIApi(baseurl=f"{self.origin}/sdapi/v1", username=WEBUI_USERNAME, password=WEBUI_PASSWORD)
         self.cpkt_history = History(size=ckpt_history_size)
         self.controlnet_history = History(size=controlnet_history_size)
+        self._tic = None
 
-    def __enter__(self):
+    def occupy(self):
         self._tic = time.time()
         self._occupy()
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self._release()
 
     def get_state_duration(self):
         return time.time() - self.status_time
@@ -64,7 +62,7 @@ class Res:
         logger.info(f"{self.origin} start occupy")
         self._update_status(S_RUNNING)
 
-    def _release(self):
+    def release(self):
         logger.info(f"{self.origin} release, cost time: {time.time() - self._tic:.2f}s")
         self._update_status(S_IDLE)
 
@@ -235,6 +233,7 @@ class Res:
             data["images"].append(base64.b64encode(pickle.dumps(image)))
         logger.info(f"gen image done: {self.origin}")
         mem_storage.update(gen_id=gen_id, data=data, status="finish")
+        self.release()
         return data
 
     def async_process(self, item):
@@ -335,6 +334,7 @@ class Pool:
             idx = score_list.index(max(score_list))
             res = res_list[idx]
             logger.info(f"pick res from {len(res_list)} idle res => {res.origin}")
+            res.occupy()
             return res
         else:
             raise BusyException("all res is busy")
