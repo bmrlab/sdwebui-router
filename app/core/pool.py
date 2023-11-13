@@ -11,14 +11,22 @@ import pickle
 import zipfile
 from PIL import Image
 from io import BytesIO
+import concurrent.futures
+from uuid import uuid4
 from app.core.model_load_history import History
+from app.core.mem_storage import MemoryStorage
 import os
 
 S_RUNNING = "running"
 S_IDLE = "idle"
 
 WEBUI_USERNAME = os.environ.get("WEBUI_USERNAME", "admin")
-WEBUI_PASSWORD = os.environ.get("WEBUI_PASSWORD", "admin")
+WEBUI_PASSWORD = os.environ.get("WEBUI_PASSWORD", "admin123")
+
+# 异步执行器
+executor = concurrent.futures.ThreadPoolExecutor(max_workers=20)
+# 结果记录临时存储
+mem_storage = MemoryStorage(ttl=1800)
 
 
 class Res:
@@ -203,7 +211,7 @@ class Res:
             self.webuiapi.util_set_model(model)
             self.cpkt_history.add(model)
 
-    def process(self, item):
+    def process(self, item, gen_id=""):
         # 初始化
         if item.setup_params:
             # 带有setup_params的任务为txt2img / img2img
@@ -213,7 +221,10 @@ class Res:
             # 参数预处理
             self._sd_params_preprocessing(item)
 
+        mem_storage.update(gen_id=gen_id, status="running")
+
         # 开始触发生成
+        logger.info(f"send gen image request to webui: {self.origin}")
         result_data = getattr(self.webuiapi, item.mode)(**item.sd_params)
         data = {
             "info": result_data.info,
@@ -222,7 +233,20 @@ class Res:
         }
         for image in result_data.images:
             data["images"].append(base64.b64encode(pickle.dumps(image)))
+        logger.info(f"gen image done: {self.origin}")
+        mem_storage.update(gen_id=gen_id, data=data, status="finish")
         return data
+
+    def async_process(self, item):
+        """
+        异步触发任务执行
+        :param item:
+        :return:
+        """
+        gen_id = str(uuid4())
+        mem_storage.update(gen_id=gen_id, status="start", origin=self.origin)
+        executor.submit(self.process, item, gen_id=gen_id)
+        return gen_id
 
 
 class Pool:
