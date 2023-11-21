@@ -300,7 +300,7 @@ class Pool:
         for res in self.res_list:
             if res.status == S_RUNNING:
                 if res.get_state_duration() > self.max_running_timeout:
-                    res._release()
+                    res.release()
 
     def idle_res_list(self, block=False, shuffle=True):
         while block:
